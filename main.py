@@ -58,12 +58,19 @@ async def login(body: AuthRequest):
 def public_info():
     return {"message": "Welcome stranger! This info is public."}
 
-
 @app.get("/protected/profile")
 def protected_profile(authorization: Optional[str] = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         return JSONResponse(status_code=401, content={"error": "Access token required"})
-    
+
     token = authorization.split(" ")[1]
-    # Stage 3'te bu token'ı gerçekten doğrulayacağız, şimdilik sadece varlığını kontrol ediyoruz
-    return {"message": "token received, not verified yet"}
+    try:
+        user_response = supabase.auth.get_user(token)
+        user = user_response.user
+        return JSONResponse(status_code=200, content={
+            "id": user.id,
+            "email": user.email,
+            "created_at": str(user.created_at)
+        })
+    except Exception as e:
+        return JSONResponse(status_code=401, content={"error": "Invalid or expired token"})
