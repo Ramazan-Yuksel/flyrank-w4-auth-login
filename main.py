@@ -5,6 +5,8 @@ import os
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from fastapi import Header
+from typing import Optional
 
 load_dotenv()
 
@@ -52,3 +54,16 @@ async def login(body: AuthRequest):
         })
     except Exception as e:
         return JSONResponse(status_code=401, content={"error": "Invalid login credentials"})
+@app.get("/public/info")
+def public_info():
+    return {"message": "Welcome stranger! This info is public."}
+
+
+@app.get("/protected/profile")
+def protected_profile(authorization: Optional[str] = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return JSONResponse(status_code=401, content={"error": "Access token required"})
+    
+    token = authorization.split(" ")[1]
+    # Stage 3'te bu token'ı gerçekten doğrulayacağız, şimdilik sadece varlığını kontrol ediyoruz
+    return {"message": "token received, not verified yet"}
