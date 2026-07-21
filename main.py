@@ -9,6 +9,7 @@ from fastapi import Header
 from typing import Optional
 from fastapi import Depends
 from fastapi import HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 load_dotenv()
 
@@ -18,6 +19,7 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = FastAPI()
+security = HTTPBearer()
 class AuthRequest(BaseModel):
     email: str | None = None
     password: str | None = None
@@ -60,11 +62,8 @@ async def login(body: AuthRequest):
 def public_info():
     return {"message": "Welcome stranger! This info is public."}
 
-def get_current_user(authorization: Optional[str] = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Access token required")
-
-    token = authorization.split(" ")[1]
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
 
     try:
         user_response = supabase.auth.get_user(token)
