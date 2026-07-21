@@ -7,6 +7,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from fastapi import Header
 from typing import Optional
+from fastapi import Depends
+from fastapi import HTTPException
 
 load_dotenv()
 
@@ -58,19 +60,36 @@ async def login(body: AuthRequest):
 def public_info():
     return {"message": "Welcome stranger! This info is public."}
 
-@app.get("/protected/profile")
-def protected_profile(authorization: Optional[str] = Header(None)):
+def get_current_user(authorization: Optional[str] = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
-        return JSONResponse(status_code=401, content={"error": "Access token required"})
+        raise HTTPException(status_code=401, detail="Access token required")
 
     token = authorization.split(" ")[1]
+
     try:
         user_response = supabase.auth.get_user(token)
-        user = user_response.user
-        return JSONResponse(status_code=200, content={
-            "id": user.id,
-            "email": user.email,
-            "created_at": str(user.created_at)
-        })
+        return {"user": user_response.user, "token": token}
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+@app.get("/protected/profile")
+def protected_profile(current=Depends(get_current_user)):
+    user = current["user"]
+    return {
+        "id": user.id,
+        "email": user.email,
+        "created_at": str(user.created_at)
+    }
+
+
+@app.get("/protected/dashboard")
+def protected_dashboard(current=Depends(get_current_user)):
+    return {"message": f"Welcome to your dashboard, {current['user'].email}"}
+
+
+@app.post("/auth/logout")
+def logout(current=Depends(get_current_user)):
+    try:
+        supabase.auth.sign_out()
+        return JSONResponse(status_code=204, content=None)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"error": "Invalid or expired token"})
+        return JSONResponse(status_code=400, content={"error": str(e)})
